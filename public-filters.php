@@ -28,6 +28,10 @@ add_filter( 'taxonomy-images-queried-term-image-id',     'taxonomy_images_plugin
 add_filter( 'taxonomy-images-queried-term-image-object', 'taxonomy_images_plugin_get_queried_term_image_object' );
 add_filter( 'taxonomy-images-queried-term-image-url',    'taxonomy_images_plugin_get_queried_term_image_url', 10, 2 );
 
+add_filter( 'taxonomy-images-term-image-data',   'taxonomy_images_plugin_get_term_image_data', 10, 2 );
+add_filter( 'taxonomy-images-term-image-id',     'taxonomy_images_plugin_get_term_image_id' );
+add_filter( 'taxonomy-images-term-image-url',    'taxonomy_images_plugin_get_term_image_url', 10, 2 );
+
 
 /**
  * Get Terms.
@@ -372,13 +376,68 @@ function taxonomy_images_plugin_get_queried_term_image( $default, $args = array(
  * @access    private   Use the 'taxonomy-images-queried-term-image-id' filter.
  * @since     0.7
  */
-function taxonomy_images_plugin_get_queried_term_image_id( $default ) {
+function taxo
+nomy_images_plugin_get_queried_term_image_id( $default ) {
 	$filter = 'taxonomy-images-queried-term-image-id';
 	if ( $filter !== current_filter() ) {
 		taxonomy_image_plugin_please_use_filter( __FUNCTION__, $filter );
 	}
 
 	$obj = get_queried_object();
+
+	/* Return early is we are not in a term archive. */
+	if ( ! isset( $obj->term_taxonomy_id ) ) {
+		trigger_error( sprintf( esc_html__( '%1$s is not a property of the current queried object. This usually happens when the %2$s filter is used in an unsupported template file. This filter has been designed to work in taxonomy archives which are traditionally served by one of the following template files: category.php, tag.php or taxonomy.php. Learn more about %3$s.', 'taxonomy-images' ),
+			'<code>' . esc_html__( 'term_taxonomy_id', 'taxonomy-images' ) . '</code>',
+			'<code>' . esc_html( $filter ) . '</code>',
+			'<a href="http://codex.wordpress.org/Template_Hierarchy">' . esc_html( 'template hierarchy', 'taxonomy-images' ) . '</a>'
+			) );
+		return 0;
+	}
+
+	if ( ! taxonomy_image_plugin_check_taxonomy( $obj->taxonomy, $filter ) ) {
+		return 0;
+	}
+
+	$associations = taxonomy_image_plugin_get_associations();
+	$tt_id = absint( $obj->term_taxonomy_id );
+
+	$ID = 0;
+	if ( array_key_exists( $tt_id, $associations ) ) {
+		$ID = absint( $associations[$tt_id] );
+	}
+
+	return $ID;
+}
+
+/**
+ * Term Image ID.
+ *
+ * Designed to be used in archive templates including
+ * (but not limited to) archive.php, category.php, tag.php,
+ * taxonomy.php as well as derivatives of these templates.
+ *
+ * Returns an integer representing the image attachment's ID.
+ * In the event that an image has been associated zero will
+ * be returned.
+ *
+ * This function should never be called directly in any file
+ * however it may be access in any template file via the
+ * 'taxonomy-images-queried-term-image-id' filter.
+ *
+ * @param     mixed     Default value for apply_filters() to return. Unused.
+ * @return    int       Image attachment's ID.
+ *
+ * @access    private   Use the 'taxonomy-images-queried-term-image-id' filter.
+ * @since     0.7
+ */
+function taxonomy_images_plugin_get_term_image_id( $default, $args ) {
+	$filter = 'taxonomy-images-term-image-id';
+	if ( $filter !== current_filter() ) {
+		taxonomy_image_plugin_please_use_filter( __FUNCTION__, $filter );
+	}
+
+	$obj = $args->term;
 
 	/* Return early is we are not in a term archive. */
 	if ( ! isset( $obj->term_taxonomy_id ) ) {
@@ -486,6 +545,53 @@ function taxonomy_images_plugin_get_queried_term_image_url( $default, $args = ar
 	return $url;
 }
 
+/**
+ * Term Image URL.
+ *
+ * Returns a url to the image associated with the specified
+ * term. In the event that no image is found an empty string will
+ * be returned.
+ *
+ * Designed to be used in archive templates including
+ * (but not limited to) archive.php, category.php, tag.php,
+ * taxonomy.php as well as derivatives of these templates.
+ *
+ * Recognized Arguments
+ *
+ * image_size (string) - May be any image size registered with
+ * WordPress. If no image size is specified, 'thumbnail' will be
+ * used as a default value. In the event that an unregistered size
+ * is specified, this function will return an empty string.
+ *
+ * term (term) - The term.
+ *
+ * @param     mixed          Default value for apply_filters() to return. Unused.
+ * @param     array          Named Arguments.
+ * @return    string         Image URL.
+ *
+ * @access    private        Use the 'taxonomy-images-queried-term-image-url' filter.
+ * @since     0.7
+ */
+function taxonomy_images_plugin_get_term_image_url( $default, $args = array() ) {
+	$filter = 'taxonomy-images-term-image-url';
+	if ( $filter !== current_filter() ) {
+		taxonomy_image_plugin_please_use_filter( __FUNCTION__, $filter );
+	}
+
+	$args = wp_parse_args( $args, array(
+		'image_size' => 'thumbnail',
+		) );
+
+	$data = apply_filters( 'taxonomy-images-term-image-data', array(), $args );
+
+	$url = '';
+	if ( isset( $data['url'] ) ) {
+		$url = $data['url'];
+	}
+	return $url;
+}
+
+
 
 /**
  * Queried Term Image Data.
@@ -524,6 +630,76 @@ function taxonomy_images_plugin_get_queried_term_image_data( $default, $args = a
 		) );
 
 	$ID = apply_filters( 'taxonomy-images-queried-term-image-id', 0 );
+
+	if ( empty( $ID ) ) {
+		return array();
+	}
+
+	$data = array();
+
+	if ( in_array( $args['image_size'], array( 'full', 'fullsize' ) ) ) {
+		$src = wp_get_attachment_image_src( $ID, 'full' );
+
+		if ( isset( $src[0] ) ) {
+			$data['url'] = $src[0];
+		}
+		if ( isset( $src[1] ) ) {
+			$data['width'] = $src[1];
+		}
+		if ( isset( $src[2] ) ) {
+			$data['height'] = $src[2];
+		}
+	}
+	else {
+		$data = image_get_intermediate_size( $ID, $args['image_size'] );
+	}
+
+	if ( ! empty( $data ) ) {
+		return $data;
+	}
+
+	return array();
+}
+
+/**
+ * Queried Term Image Data.
+ *
+ * Returns a url to the image associated with the specified
+ * term. In the event that no image is found an empty string will
+ * be returned.
+ *
+ * Designed to be used in archive templates including
+ * (but not limited to) archive.php, category.php, tag.php,
+ * taxonomy.php as well as derivatives of these templates.
+ *
+ * Recognized Arguments
+ *
+ * image_size (string) - May be any image size registered with
+ * WordPress. If no image size is specified, 'thumbnail' will be
+ * used as a default value. In the event that an unregistered size
+ * is specified, this function will return an empty array.
+ *
+ * term (term) - The term.
+ *
+ * @param     mixed          Default value for apply_filters() to return. Unused.
+ * @param     array          Named Arguments.
+ * @return    array          Image data: url, width and height.
+ *
+ * @access    private        Use the 'taxonomy-images-queried-term-image-data' filter.
+ * @since     0.7
+ * @alter     0.7.2
+ */
+function taxonomy_images_plugin_get_image_data( $default, $args = array() ) {
+	$filter = 'taxonomy-images-term-image-data';
+	if ( $filter !== current_filter() ) {
+		taxonomy_image_plugin_please_use_filter( __FUNCTION__, $filter );
+	}
+
+	$args = wp_parse_args( $args, array(
+		'image_size' => 'thumbnail',
+		) );
+
+	$ID = apply_filters( 'taxonomy-images-term-image-id', 0, $args );
 
 	if ( empty( $ID ) ) {
 		return array();
