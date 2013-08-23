@@ -376,8 +376,7 @@ function taxonomy_images_plugin_get_queried_term_image( $default, $args = array(
  * @access    private   Use the 'taxonomy-images-queried-term-image-id' filter.
  * @since     0.7
  */
-function taxo
-nomy_images_plugin_get_queried_term_image_id( $default ) {
+function taxonomy_images_plugin_get_queried_term_image_id( $default ) {
 	$filter = 'taxonomy-images-queried-term-image-id';
 	if ( $filter !== current_filter() ) {
 		taxonomy_image_plugin_please_use_filter( __FUNCTION__, $filter );
