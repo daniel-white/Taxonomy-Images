@@ -688,7 +688,7 @@ function taxonomy_images_plugin_get_queried_term_image_data( $default, $args = a
  * @since     0.7
  * @alter     0.7.2
  */
-function taxonomy_images_plugin_get_image_data( $default, $args = array() ) {
+function taxonomy_images_plugin_get_term_image_data( $default, $args = array() ) {
 	$filter = 'taxonomy-images-term-image-data';
 	if ( $filter !== current_filter() ) {
 		taxonomy_image_plugin_please_use_filter( __FUNCTION__, $filter );
